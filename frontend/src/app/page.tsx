@@ -5,17 +5,14 @@ import Header from "@/components/layout/Header";
 import VideoUploader from "@/components/video/VideoUploader";
 import VideoPlayer from "@/components/video/VideoPlayer";
 import DashboardPanel from "@/components/dashboard/DashboardPanel";
-import { uploadVideo, getAnalysisStatus, getAnalysisResult } from "@/lib/api";
-import { ApiError } from "@/lib/api";
+import { uploadVideo, getAnalysisStatus, getAnalysisResult, getVideoUrl, ApiError } from "@/lib/api";
 import type { AnalysisResult, FrameData, AppState } from "@/types";
 
 const POLL_INTERVAL_MS = 1000;
+const STORAGE_KEY = "climbing_analysis_job";
 
 export default function Home() {
-  const [video, setVideo] = useState<{
-    file: File;
-    previewUrl: string;
-  } | null>(null);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
 
   const [appState, setAppState] = useState<AppState>("idle");
   const [progress, setProgress] = useState(0);
@@ -25,6 +22,38 @@ export default function Home() {
 
   const jobIdRef = useRef<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Restore previous session on mount
+  useEffect(() => {
+    const savedJobId = localStorage.getItem(STORAGE_KEY);
+    if (!savedJobId) return;
+
+    (async () => {
+      try {
+        const status = await getAnalysisStatus(savedJobId);
+        jobIdRef.current = savedJobId;
+
+        if (status.status === "completed") {
+          const result = await getAnalysisResult(savedJobId);
+          setVideoSrc(getVideoUrl(savedJobId));
+          setAnalysisResult(result);
+          setAppState("ready");
+          if (result.frames.length > 0) setCurrentFrame(result.frames[0]);
+        } else if (status.status === "processing" || status.status === "pending") {
+          setVideoSrc(getVideoUrl(savedJobId));
+          setAppState("analyzing");
+          startPolling(savedJobId);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+        setVideoSrc(null);
+        setAppState("idle");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Clean up polling on unmount
   useEffect(() => {
@@ -105,7 +134,7 @@ export default function Home() {
   // Upload flow
   const handleVideoSelect = useCallback(
     async (file: File, previewUrl: string) => {
-      setVideo({ file, previewUrl });
+      setVideoSrc(previewUrl);
       setErrorMsg(null);
       setAppState("uploading");
       setProgress(0);
@@ -113,6 +142,9 @@ export default function Home() {
       try {
         const status = await uploadVideo(file);
         jobIdRef.current = status.jobId;
+        localStorage.setItem(STORAGE_KEY, status.jobId);
+        // Switch to backend-served video URL
+        setVideoSrc(getVideoUrl(status.jobId));
         setAppState("analyzing");
         setProgress(status.progress);
         startPolling(status.jobId);
@@ -131,22 +163,20 @@ export default function Home() {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
-    if (video?.previewUrl) {
-      URL.revokeObjectURL(video.previewUrl);
-    }
-    setVideo(null);
+    localStorage.removeItem(STORAGE_KEY);
+    setVideoSrc(null);
     setAppState("idle");
     setProgress(0);
     setErrorMsg(null);
     setAnalysisResult(null);
     setCurrentFrame(null);
     jobIdRef.current = null;
-  }, [video]);
+  }, []);
 
   // Determine what to show in the main area
   const renderMain = () => {
     // Show uploader when idle or error-before-video
-    if (!video) {
+    if (!videoSrc) {
       return <VideoUploader onVideoSelect={handleVideoSelect} />;
     }
 
@@ -179,7 +209,7 @@ export default function Home() {
         )}
 
         <VideoPlayer
-          src={video.previewUrl}
+          src={videoSrc}
           onReset={handleReset}
           frameData={appState === "ready" ? currentFrame : null}
           onTimeUpdate={appState === "ready" ? handleTimeUpdate : undefined}
@@ -190,7 +220,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-full min-h-screen">
-      <Header />
+      <Header hasVideo={!!videoSrc} onReset={handleReset} />
       <main className="flex flex-1 flex-col lg:flex-row gap-4 p-4">
         {renderMain()}
         <DashboardPanel frameData={appState === "ready" ? currentFrame : undefined} />

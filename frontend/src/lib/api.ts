@@ -143,3 +143,10 @@ export async function getAnalysisResult(jobId: string): Promise<AnalysisResult> 
   const raw = await handleResponse<RawAnalysisResult>(res);
   return mapResult(raw);
 }
+
+/**
+ * Get video file URL for a given job.
+ */
+export function getVideoUrl(jobId: string): string {
+  return `${API_BASE}/api/analyze/${jobId}/video`;
+}
