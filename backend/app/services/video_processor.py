@@ -315,14 +315,21 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
     hold_map = _merge_hold_detections(all_hold_detections)
     logger.info("Hold map: %d stable holds from %d scan frames", len(hold_map), len(scan_indices))
 
-    # ── Phase 2: Determine route color from early contacts ──────────
-    # Scan early frames, collect the color of the closest hold to each hand,
-    # then vote — the most frequent contact color = route color.
+    # ── Phase 2: Contact-based route detection (cached poses) ────────
     estimator = PoseEstimator()
-    route_color = None
-    contact_colors: list[str] = []
 
-    for frame_number, _ in frame_indices[:40]:  # scan first ~20 seconds
+    _CONTACT_MARGIN = 0.01
+    _MIN_CONTACT_SECONDS = 1.0
+    _MIN_CONTACT_FRAMES = max(3, int(_MIN_CONTACT_SECONDS * (settings.frame_rate or 2)))
+    _CONTACT_KP_NAMES = ["left_index", "right_index", "left_foot_index", "right_foot_index"]
+
+    hold_contact_count: dict[str, int] = {h["id"]: 0 for h in hold_map}
+    hold_ever_contacted: set[str] = set()
+
+    # Cache pose results to avoid re-computing in Phase 3
+    pose_cache: dict[int, list] = {}  # frame_number → keypoints
+
+    for frame_number, timestamp in frame_indices:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
         ret, frame_bgr = cap.read()
         if not ret or frame_bgr is None:
@@ -330,38 +337,58 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
 
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         keypoints = estimator.estimate(frame_rgb)
+        pose_cache[frame_number] = keypoints  # cache for Phase 3
+
         if not keypoints:
+            for hid in hold_contact_count:
+                hold_contact_count[hid] = 0
             continue
 
-        lwrist = next((k for k in keypoints if k.name == "left_wrist" and k.confidence >= 0.3), None)
-        rwrist = next((k for k in keypoints if k.name == "right_wrist" and k.confidence >= 0.3), None)
+        kp_positions = [(kp.x, kp.y) for kp in keypoints
+                        if kp.name in _CONTACT_KP_NAMES and kp.confidence >= 0.3]
 
-        for wrist in [lwrist, rwrist]:
-            if not wrist:
-                continue
-            # Find the single closest hold to this hand
-            best_dist = float("inf")
-            best_color = None
+        currently_overlapping: set[str] = set()
+        for kx, ky in kp_positions:
             for h in hold_map:
-                dist = ((wrist.x - h["x"]) ** 2 + (wrist.y - h["y"]) ** 2) ** 0.5
-                if dist < best_dist:
-                    best_dist = dist
-                    best_color = h.get("color", "unknown")
-            # Only count if very close (touching)
-            if best_dist < 0.05 and best_color and best_color != "unknown":
-                contact_colors.append(best_color)
+                hx, hy = h["x"], h["y"]
+                hw = h.get("width", 0.05)
+                hh = h.get("height", 0.05)
+                half_w = hw / 2 + _CONTACT_MARGIN
+                half_h = hh / 2 + _CONTACT_MARGIN
+                if hx - half_w <= kx <= hx + half_w and hy - half_h <= ky <= hy + half_h:
+                    currently_overlapping.add(h["id"])
 
-    if contact_colors:
-        route_color = Counter(contact_colors).most_common(1)[0][0]
-        logger.info("Route color from contacts: %s (votes: %s)", route_color, Counter(contact_colors).most_common(3))
+        for hid in hold_contact_count:
+            if hid in currently_overlapping:
+                hold_contact_count[hid] += 1
+                if hold_contact_count[hid] >= _MIN_CONTACT_FRAMES:
+                    hold_ever_contacted.add(hid)
+            else:
+                hold_contact_count[hid] = 0
 
-    # Filter hold map by route color
+    # Determine route color from contacted holds
+    route_color = None
+    contacted_holds = [h for h in hold_map if h["id"] in hold_ever_contacted]
+    logger.info("Contact-detected route holds: %d/%d", len(contacted_holds), len(hold_map))
+
+    if contacted_holds:
+        contact_colors = [h.get("color", "unknown") for h in contacted_holds if h.get("color") != "unknown"]
+        if contact_colors:
+            route_color = Counter(contact_colors).most_common(1)[0][0]
+            logger.info("Route color: %s (votes: %s)", route_color, Counter(contact_colors).most_common(3))
+
     route_holds = hold_map
     if route_color:
         route_holds = [h for h in hold_map if h.get("color") == route_color]
-        logger.info("Route holds: %d/%d (color=%s)", len(route_holds), len(hold_map), route_color)
+        logger.info("Route holds (color=%s): %d/%d", route_color, len(route_holds), len(hold_map))
 
-    # ── Phase 3: Per-frame analysis with fixed hold map ─────────────
+    # ── Phase 3: Per-frame analysis (reuses cached poses) ──────────
+    _HOLD_REDETECT_INTERVAL = 5
+    current_frame_holds = route_holds
+    last_good_pose: list[dict] = []
+    _pose_miss_count = 0
+    _MAX_POSE_MISS = 3
+
     frame_results: list[dict] = []
 
     for idx, (frame_number, timestamp) in enumerate(frame_indices):
@@ -371,17 +398,66 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
         if on_progress and total_frames > 0:
             on_progress((idx + 1) / total_frames * 100)
 
-        pose_keypoints = []
-        if ret and frame_bgr is not None:
+        if not ret or frame_bgr is None:
+            frame_results.append({
+                "frame_number": frame_number,
+                "timestamp": timestamp,
+                "holds": current_frame_holds,
+                "pose": [],
+                "predictions": [],
+                "force_distribution": None,
+                "route_color": route_color,
+            })
+            continue
+
+        # Re-detect holds periodically (handles camera movement)
+        if idx % _HOLD_REDETECT_INTERVAL == 0:
+            raw_holds = hold_detector.detect(frame_bgr)
+            if raw_holds:
+                frame_holds = []
+                for hi, rh in enumerate(raw_holds):
+                    hold_data = {
+                        "id": f"h{hi}",
+                        "x": rh["x"] / img_w,
+                        "y": rh["y"] / img_h,
+                        "width": rh["width"] / img_w,
+                        "height": rh["height"] / img_h,
+                        "confidence": rh["confidence"],
+                    }
+                    hold_data["color"] = _extract_hold_color(
+                        frame_bgr, int(rh["x"]), int(rh["y"]),
+                        int(rh["width"]), int(rh["height"]),
+                    )
+                    frame_holds.append(hold_data)
+                if route_color:
+                    filtered = [h for h in frame_holds if h.get("color") == route_color]
+                    current_frame_holds = filtered if filtered else frame_holds
+                else:
+                    current_frame_holds = frame_holds
+        # Pose estimation (use cache from Phase 2 if available)
+        cached = pose_cache.get(frame_number)
+        if cached is not None:
+            keypoints = cached
+        else:
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
             keypoints = estimator.estimate(frame_rgb)
-            pose_keypoints = [kp.model_dump() for kp in keypoints]
+        pose_keypoints = [kp.model_dump() for kp in keypoints]
 
-        # Path prediction with fixed route holds
+        if pose_keypoints:
+            last_good_pose = pose_keypoints
+            _pose_miss_count = 0
+        else:
+            _pose_miss_count += 1
+            if _pose_miss_count <= _MAX_POSE_MISS and last_good_pose:
+                pose_keypoints = last_good_pose
+            else:
+                last_good_pose = []
+
+        # Path prediction
         predictions = []
-        if pose_keypoints and route_holds:
+        if pose_keypoints and current_frame_holds:
             kps = [PK(**kp) for kp in pose_keypoints]
-            raw_preds = predict_next_holds(kps, route_holds)
+            raw_preds = predict_next_holds(kps, current_frame_holds)
             predictions = [p.model_dump() for p in raw_preds]
 
         # Force distribution
@@ -393,7 +469,7 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
         frame_results.append({
             "frame_number": frame_number,
             "timestamp": timestamp,
-            "holds": route_holds,  # Same holds for every frame
+            "holds": current_frame_holds,
             "pose": pose_keypoints,
             "predictions": predictions,
             "force_distribution": force_dist,
