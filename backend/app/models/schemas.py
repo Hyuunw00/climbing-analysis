@@ -31,6 +31,27 @@ class Prediction(BaseModel):
     hand: str  # "left" or "right"
 
 
+class ForceDistribution(BaseModel):
+    """Estimated force distribution across contact points."""
+
+    left_hand: float = 0.0
+    right_hand: float = 0.0
+    left_foot: float = 0.0
+    right_foot: float = 0.0
+    center_of_mass: dict[str, float] = {}
+
+
+class FrameMetrics(BaseModel):
+    """Performance metrics for a single frame."""
+
+    smoothness: float = 50.0
+    technique: float = 50.0
+    stable: float = 50.0
+    adhesion: float = 50.0
+    score: float = 50.0
+    vertical_velocity: float = 0.0
+
+
 class FrameData(BaseModel):
     """Analysis data for a single frame."""
 
@@ -39,6 +60,8 @@ class FrameData(BaseModel):
     holds: list[Hold] = []
     pose: list[PoseKeypoint] = []
     predictions: list[Prediction] = []
+    force_distribution: ForceDistribution | None = None
+    metrics: FrameMetrics | None = None
 
 
 class AnalysisResponse(BaseModel):

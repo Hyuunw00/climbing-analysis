@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from app.config import settings
 from app.services.hold_detector import hold_detector
 from app.services.path_predictor import predict_next_holds
+from app.services.force_estimator import estimate_force_distribution
+from app.services.performance_scorer import compute_frame_metrics
 from app.services.pose_estimator import PoseEstimator
 
 
@@ -198,6 +200,13 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
                         if c != "unknown":
                             hand_proximity_colors.append(c)
 
+        # Force distribution estimation
+        force_dist = None
+        if pose_keypoints:
+            from app.models.schemas import PoseKeypoint as PK
+            kps_for_force = [PK(**kp) for kp in pose_keypoints]
+            force_dist = estimate_force_distribution(kps_for_force)
+
         frame_results.append(
             {
                 "frame_number": frame_number,
@@ -205,6 +214,7 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
                 "holds": detected_holds,
                 "pose": pose_keypoints,
                 "predictions": [],  # filled in pass 2
+                "force_distribution": force_dist,
             }
         )
 
@@ -228,6 +238,19 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
             kps = [PK(**kp) for kp in frame["pose"]]
             raw_preds = predict_next_holds(kps, frame["holds"])
             frame["predictions"] = [p.model_dump() for p in raw_preds]
+
+    # Pass 3: compute performance metrics across frame sequence
+    effective_fps = metadata.fps / max(1, int(metadata.fps / (settings.frame_rate or metadata.fps)))
+    metrics_list = compute_frame_metrics(frame_results, effective_fps)
+    for frame, m in zip(frame_results, metrics_list):
+        frame["metrics"] = {
+            "smoothness": m.smoothness,
+            "technique": m.technique,
+            "stable": m.stable,
+            "adhesion": m.adhesion,
+            "score": m.score,
+            "vertical_velocity": m.vertical_velocity,
+        }
 
     return {
         "metadata": {
