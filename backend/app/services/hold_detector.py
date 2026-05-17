@@ -61,6 +61,7 @@ class HoldDetector:
             results = self._model.predict(
                 frame,
                 conf=settings.hold_confidence_threshold,
+                imgsz=640,
                 verbose=False,
             )
         except Exception as e:

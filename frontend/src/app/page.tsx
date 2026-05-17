@@ -240,12 +240,20 @@ function StatusBanner({
 }) {
   return (
     <div className="rounded-lg bg-accent/10 border border-accent/30 px-4 py-3 flex flex-col gap-2">
-      <span className="text-sm text-accent font-medium">{label}</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-full bg-accent animate-pulse" />
+          <span className="text-sm text-accent font-medium">{label}</span>
+        </div>
+        {progress !== null && progress > 0 && (
+          <span className="text-xs font-mono text-accent">{Math.round(progress)}%</span>
+        )}
+      </div>
       {progress !== null && (
         <div className="h-1.5 rounded-full bg-border overflow-hidden">
           <div
-            className="h-full rounded-full bg-accent transition-all duration-300"
-            style={{ width: `${progress}%` }}
+            className="h-full rounded-full bg-accent transition-all duration-500"
+            style={{ width: `${Math.max(progress, 2)}%` }}
           />
         </div>
       )}

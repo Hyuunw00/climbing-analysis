@@ -23,7 +23,11 @@ def _run_analysis(job_id: str, file_path: str) -> None:
 
     try:
         _jobs[job_id]["status"] = "processing"
-        result = process_video(file_path)
+
+        def on_progress(pct: float) -> None:
+            _jobs[job_id]["progress"] = round(pct, 1)
+
+        result = process_video(file_path, on_progress=on_progress)
 
         if "error" in result:
             logger.error("Analysis failed for %s: %s", job_id, result["error"])

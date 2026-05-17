@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     upload_dir: str = "./uploads"
     max_file_size: int = 104857600  # 100MB
-    frame_rate: int = 5
+    frame_rate: int = 2
 
     # Hold detection model
     hold_model_path: str = "models/yolov8n-freeclimbs-detect-2.pt"
