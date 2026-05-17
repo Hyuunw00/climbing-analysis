@@ -28,3 +28,4 @@ backend/uploads/
 # Models (large files)
 backend/models/*.pt
 backend/models/*.onnx
+models/pose_landmarker_heavy.task
