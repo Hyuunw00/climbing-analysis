@@ -92,6 +92,12 @@ class PoseEstimator:
                 return []
 
             landmarks = result.pose_landmarks[0]
+
+            # Filter out low-confidence detections (ghost poses)
+            avg_visibility = sum(lm.visibility for lm in landmarks) / len(landmarks)
+            if avg_visibility < 0.4:
+                return []
+
             keypoints: list[PoseKeypoint] = []
             for idx, landmark in enumerate(landmarks):
                 name = _LANDMARK_NAMES[idx] if idx < len(_LANDMARK_NAMES) else f"landmark_{idx}"
