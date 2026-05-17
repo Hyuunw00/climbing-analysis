@@ -49,8 +49,9 @@ class TestPoseKeypoint:
 
 class TestPrediction:
     def test_valid_prediction(self):
-        p = Prediction(hold_id="hold_1", probability=0.85)
+        p = Prediction(hold_id="hold_1", probability=0.85, hand="left")
         assert p.hold_id == "hold_1"
+        assert p.hand == "left"
 
     def test_missing_field(self):
         with pytest.raises(ValidationError):
@@ -70,7 +71,7 @@ class TestFrameData:
             timestamp=0.5,
             holds=[Hold(id="h1", x=1, y=2, width=3, height=4, confidence=0.9)],
             pose=[PoseKeypoint(name="nose", x=0.1, y=0.2)],
-            predictions=[Prediction(hold_id="h1", probability=0.7)],
+            predictions=[Prediction(hold_id="h1", probability=0.7, hand="right")],
         )
         assert len(fd.holds) == 1
         assert len(fd.pose) == 1
