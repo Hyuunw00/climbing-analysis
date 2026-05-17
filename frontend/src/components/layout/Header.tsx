@@ -1,15 +1,48 @@
+import type { AppMode } from "@/types";
+
 interface HeaderProps {
   hasVideo?: boolean;
   onReset?: () => void;
+  appMode: AppMode;
+  onModeChange: (mode: AppMode) => void;
+  isCameraActive?: boolean;
 }
 
-export default function Header({ hasVideo, onReset }: HeaderProps) {
+export default function Header({ hasVideo, onReset, appMode, onModeChange, isCameraActive }: HeaderProps) {
   return (
     <header className="flex items-center justify-between px-4 py-3 border-b border-border">
       <h1 className="text-sm font-bold tracking-widest uppercase">
         Climbing Analytics
       </h1>
       <div className="flex items-center gap-3">
+        {/* Mode toggle - show when idle (no video and not in camera mode) */}
+        {!hasVideo && !isCameraActive && (
+          <div className="flex items-center rounded border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => onModeChange("upload")}
+              className={`text-xs font-mono px-2.5 py-1 transition-colors ${
+                appMode === "upload"
+                  ? "bg-accent text-black"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              Upload
+            </button>
+            <button
+              type="button"
+              onClick={() => onModeChange("camera")}
+              className={`text-xs font-mono px-2.5 py-1 transition-colors ${
+                appMode === "camera"
+                  ? "bg-accent text-black"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              Camera
+            </button>
+          </div>
+        )}
+
         {hasVideo && onReset && (
           <button
             type="button"

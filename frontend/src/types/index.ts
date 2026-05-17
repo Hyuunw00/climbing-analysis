@@ -65,3 +65,5 @@ export interface AnalysisStatus {
 }
 
 export type AppState = "idle" | "uploading" | "analyzing" | "ready" | "error";
+
+export type AppMode = "upload" | "camera";
