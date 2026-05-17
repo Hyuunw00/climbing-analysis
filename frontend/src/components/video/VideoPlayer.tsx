@@ -1,13 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { FrameData } from "@/types";
+import OverlayRenderer from "./OverlayRenderer";
 
 interface VideoPlayerProps {
   src: string;
   onReset?: () => void;
+  frameData?: FrameData | null;
+  onTimeUpdate?: (time: number) => void;
 }
 
-export default function VideoPlayer({ src, onReset }: VideoPlayerProps) {
+export default function VideoPlayer({ src, onReset, frameData = null, onTimeUpdate }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -42,21 +46,24 @@ export default function VideoPlayer({ src, onReset }: VideoPlayerProps) {
 
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
-    const onTimeUpdate = () => setCurrentTime(video.currentTime);
+    const handleTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+      onTimeUpdate?.(video.currentTime);
+    };
     const onLoadedMetadata = () => setDuration(video.duration);
 
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
-    video.addEventListener("timeupdate", onTimeUpdate);
+    video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("loadedmetadata", onLoadedMetadata);
 
     return () => {
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
-      video.removeEventListener("timeupdate", onTimeUpdate);
+      video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("loadedmetadata", onLoadedMetadata);
     };
-  }, []);
+  }, [onTimeUpdate]);
 
   return (
     <div className="flex flex-1 flex-col gap-3 min-h-[300px] lg:min-h-0">
@@ -68,10 +75,16 @@ export default function VideoPlayer({ src, onReset }: VideoPlayerProps) {
           className="absolute inset-0 w-full h-full object-contain"
           playsInline
         />
-        {/* Canvas overlay for future pose/hold rendering */}
+        {/* Canvas overlay for pose/hold rendering */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none"
+        />
+        <OverlayRenderer
+          canvasRef={canvasRef}
+          videoRef={videoRef}
+          frameData={frameData}
+          isPlaying={isPlaying}
         />
       </div>
 

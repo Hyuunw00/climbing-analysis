@@ -64,19 +64,10 @@ export default function VideoUploader({ onVideoSelect }: VideoUploaderProps) {
         return;
       }
 
-      // Simulate upload progress (no backend yet)
-      let current = 0;
-      const interval = setInterval(() => {
-        current += Math.random() * 30 + 10;
-        if (current >= 100) {
-          current = 100;
-          clearInterval(interval);
-          const previewUrl = URL.createObjectURL(file);
-          onVideoSelect(file, previewUrl);
-          setProgress(null);
-        }
-        setProgress(Math.min(current, 100));
-      }, 200);
+      // Validation passed — hand off to parent for actual upload
+      const previewUrl = URL.createObjectURL(file);
+      setProgress(null);
+      onVideoSelect(file, previewUrl);
     },
     [validateFile, onVideoSelect]
   );

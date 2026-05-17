@@ -17,6 +17,7 @@ export interface PoseKeypoint {
 export interface Prediction {
   holdId: string;
   probability: number;
+  hand?: string; // "left" or "right"
 }
 
 export interface FrameData {
@@ -40,4 +41,7 @@ export interface AnalysisStatus {
   jobId: string;
   status: "pending" | "processing" | "completed" | "failed";
   progress: number;
+  message?: string;
 }
+
+export type AppState = "idle" | "uploading" | "analyzing" | "ready" | "error";
