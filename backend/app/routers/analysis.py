@@ -1,7 +1,9 @@
+import glob
 import os
 import uuid
 import aiofiles
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 
 from app.config import settings
 from app.models.schemas import AnalysisResponse, AnalysisResult, FrameData
@@ -16,18 +18,27 @@ _jobs: dict[str, dict] = {}
 
 def _run_analysis(job_id: str, file_path: str) -> None:
     """Run video analysis in background."""
-    _jobs[job_id]["status"] = "processing"
-    result = process_video(file_path)
+    import logging
+    logger = logging.getLogger(__name__)
 
-    if "error" in result:
+    try:
+        _jobs[job_id]["status"] = "processing"
+        result = process_video(file_path)
+
+        if "error" in result:
+            logger.error("Analysis failed for %s: %s", job_id, result["error"])
+            _jobs[job_id].update({"status": "failed", "progress": 0.0})
+            return
+
+        _jobs[job_id].update({
+            "status": "completed",
+            "progress": 100.0,
+            "result": result,
+        })
+        logger.info("Analysis completed for %s", job_id)
+    except Exception as e:
+        logger.exception("Analysis crashed for %s: %s", job_id, e)
         _jobs[job_id].update({"status": "failed", "progress": 0.0})
-        return
-
-    _jobs[job_id].update({
-        "status": "completed",
-        "progress": 100.0,
-        "result": result,
-    })
 
 
 @router.post("", response_model=AnalysisResponse)
@@ -88,6 +99,23 @@ async def get_analysis_status(job_id: str) -> AnalysisResponse:
         progress=job["progress"],
         message="",
     )
+
+
+@router.get("/{job_id}/video")
+async def get_video_file(job_id: str) -> FileResponse:
+    """Serve the uploaded video file."""
+    # Check in-memory store first
+    job = _jobs.get(job_id)
+    if job and "file_path" in job:
+        if os.path.exists(job["file_path"]):
+            return FileResponse(job["file_path"], media_type="video/mp4")
+
+    # Fallback: search uploads dir by job_id
+    matches = glob.glob(os.path.join(settings.upload_dir, f"{job_id}.*"))
+    if matches and os.path.exists(matches[0]):
+        return FileResponse(matches[0], media_type="video/mp4")
+
+    raise HTTPException(status_code=404, detail="Video file not found")
 
 
 @router.get("/{job_id}/result", response_model=AnalysisResult)
