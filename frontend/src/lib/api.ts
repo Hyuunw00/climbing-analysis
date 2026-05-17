@@ -163,6 +163,21 @@ export async function uploadVideo(file: File): Promise<AnalysisStatus> {
 }
 
 /**
+ * Submit a video URL and start analysis.
+ * Returns the initial job status (with job_id).
+ */
+export async function uploadVideoUrl(url: string): Promise<AnalysisStatus> {
+  const res = await fetch(`${API_BASE}/api/analyze/url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+
+  const raw = await handleResponse<RawAnalysisResponse>(res);
+  return mapStatus(raw);
+}
+
+/**
  * Poll the status/progress of an analysis job.
  */
 export async function getAnalysisStatus(jobId: string): Promise<AnalysisStatus> {

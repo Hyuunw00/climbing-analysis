@@ -4,16 +4,23 @@ import uuid
 import aiofiles
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from app.config import settings
 from app.models.schemas import AnalysisResponse, AnalysisResult, FrameData
 from app.utils.video import validate_extension, validate_duration
+from app.utils.downloader import download_video, DownloadError
 from app.services.video_processor import process_video
 
 router = APIRouter(prefix="/analyze", tags=["analysis"])
 
 # In-memory job store (replace with DB/Redis later)
 _jobs: dict[str, dict] = {}
+
+
+class UrlRequest(BaseModel):
+    """Request body for URL-based video analysis."""
+    url: str
 
 
 def _run_analysis(job_id: str, file_path: str) -> None:
@@ -77,6 +84,44 @@ async def create_analysis(
         raise HTTPException(
             status_code=400, detail="Video too long. Max 2 minutes"
         )
+
+    # Start background analysis
+    _jobs[job_id] = {"status": "pending", "progress": 0.0, "file_path": file_path}
+    background_tasks.add_task(_run_analysis, job_id, file_path)
+
+    return AnalysisResponse(
+        job_id=job_id,
+        status="pending",
+        progress=0.0,
+        message="Analysis started",
+    )
+
+
+@router.post("/url", response_model=AnalysisResponse)
+async def create_analysis_from_url(
+    body: UrlRequest,
+    background_tasks: BackgroundTasks,
+) -> AnalysisResponse:
+    """Download a video from URL and start analysis."""
+    try:
+        file_path = download_video(
+            url=body.url,
+            output_dir=settings.upload_dir,
+            timeout=settings.download_timeout,
+        )
+    except DownloadError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Validate duration
+    if not validate_duration(file_path):
+        os.remove(file_path)
+        raise HTTPException(
+            status_code=400, detail="Video too long. Max 2 minutes"
+        )
+
+    # Extract job_id from filename (downloader uses uuid as filename)
+    basename = os.path.basename(file_path)
+    job_id = basename.rsplit(".", 1)[0]
 
     # Start background analysis
     _jobs[job_id] = {"status": "pending", "progress": 0.0, "file_path": file_path}

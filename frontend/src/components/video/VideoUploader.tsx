@@ -4,16 +4,19 @@ import { useCallback, useRef, useState } from "react";
 
 interface VideoUploaderProps {
   onVideoSelect: (file: File, previewUrl: string) => void;
+  onUrlSubmit?: (url: string) => void;
 }
 
 const ACCEPTED_FORMATS = ["video/mp4", "video/quicktime", "video/webm"];
 const MAX_SIZE_MB = 100;
 const MAX_DURATION_SEC = 120;
 
-export default function VideoUploader({ onVideoSelect }: VideoUploaderProps) {
+export default function VideoUploader({ onVideoSelect, onUrlSubmit }: VideoUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
+  const [urlInput, setUrlInput] = useState("");
+  const [urlLoading, setUrlLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = useCallback(
@@ -177,6 +180,49 @@ export default function VideoUploader({ onVideoSelect }: VideoUploaderProps) {
         className="hidden"
         onChange={handleInputChange}
       />
+
+      {/* URL input section */}
+      {onUrlSubmit && (
+        <div
+          className="w-full border-t border-border pt-4 mt-2 px-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-xs text-muted text-center mb-2">
+            or paste a video URL (YouTube, Instagram, etc.)
+          </p>
+          <form
+            className="flex gap-2 max-w-md mx-auto"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = urlInput.trim();
+              if (!trimmed) return;
+              if (!/^https?:\/\//.test(trimmed)) {
+                setError("Invalid URL. Only http/https URLs are supported.");
+                return;
+              }
+              setError(null);
+              setUrlLoading(true);
+              onUrlSubmit(trimmed);
+            }}
+          >
+            <input
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://youtube.com/watch?v=..."
+              disabled={urlLoading}
+              className="flex-1 px-3 py-2 rounded-md bg-background border border-border text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={urlLoading || !urlInput.trim()}
+              className="px-4 py-2 rounded-md bg-accent text-background text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+            >
+              {urlLoading ? "Loading..." : "Analyze"}
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

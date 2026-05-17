@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     hold_model_path: str = "models/yolov8n-freeclimbs-detect-2.pt"
     hold_confidence_threshold: float = 0.5
 
+    # URL download
+    download_timeout: int = 60  # seconds
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

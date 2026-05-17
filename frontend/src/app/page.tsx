@@ -4,15 +4,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Header from "@/components/layout/Header";
 import VideoUploader from "@/components/video/VideoUploader";
 import VideoPlayer from "@/components/video/VideoPlayer";
+import CameraCapture from "@/components/video/CameraCapture";
 import DashboardPanel from "@/components/dashboard/DashboardPanel";
-import { uploadVideo, getAnalysisStatus, getAnalysisResult, getVideoUrl, ApiError } from "@/lib/api";
-import type { AnalysisResult, FrameData, AppState } from "@/types";
+import { uploadVideo, uploadVideoUrl, getAnalysisStatus, getAnalysisResult, getVideoUrl, ApiError } from "@/lib/api";
+import type { AnalysisResult, FrameData, AppState, AppMode } from "@/types";
 
 const POLL_INTERVAL_MS = 1000;
 const STORAGE_KEY = "climbing_analysis_job";
 
 export default function Home() {
+  const [appMode, setAppMode] = useState<AppMode>("upload");
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
   const [appState, setAppState] = useState<AppState>("idle");
   const [progress, setProgress] = useState(0);
@@ -158,6 +161,32 @@ export default function Home() {
     [startPolling],
   );
 
+  // URL upload flow
+  const handleUrlSubmit = useCallback(
+    async (url: string) => {
+      setVideoSrc(null);
+      setErrorMsg(null);
+      setAppState("uploading");
+      setProgress(0);
+
+      try {
+        const status = await uploadVideoUrl(url);
+        jobIdRef.current = status.jobId;
+        localStorage.setItem(STORAGE_KEY, status.jobId);
+        setVideoSrc(getVideoUrl(status.jobId));
+        setAppState("analyzing");
+        setProgress(status.progress);
+        startPolling(status.jobId);
+      } catch (err) {
+        setErrorMsg(
+          err instanceof ApiError ? err.detail : "Failed to download video. Check the URL.",
+        );
+        setAppState("error");
+      }
+    },
+    [startPolling],
+  );
+
   const handleReset = useCallback(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
@@ -171,13 +200,44 @@ export default function Home() {
     setAnalysisResult(null);
     setCurrentFrame(null);
     jobIdRef.current = null;
+    setIsCameraActive(false);
+  }, []);
+
+  // Camera mode handlers
+  const handleModeChange = useCallback((mode: AppMode) => {
+    if (mode === appMode) return;
+    handleReset();
+    setAppMode(mode);
+    if (mode === "camera") {
+      setIsCameraActive(true);
+    }
+  }, [appMode, handleReset]);
+
+  const handleCameraFrameData = useCallback((frame: FrameData) => {
+    setCurrentFrame(frame);
+  }, []);
+
+  const handleCameraStop = useCallback(() => {
+    setIsCameraActive(false);
+    setCurrentFrame(null);
+    setAppMode("upload");
   }, []);
 
   // Determine what to show in the main area
   const renderMain = () => {
+    // Camera mode
+    if (appMode === "camera" && isCameraActive) {
+      return (
+        <CameraCapture
+          onFrameData={handleCameraFrameData}
+          onStop={handleCameraStop}
+        />
+      );
+    }
+
     // Show uploader when idle or error-before-video
     if (!videoSrc) {
-      return <VideoUploader onVideoSelect={handleVideoSelect} />;
+      return <VideoUploader onVideoSelect={handleVideoSelect} onUrlSubmit={handleUrlSubmit} />;
     }
 
     return (
@@ -220,10 +280,19 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-full min-h-screen">
-      <Header hasVideo={!!videoSrc} onReset={handleReset} />
+      <Header
+        hasVideo={!!videoSrc}
+        onReset={handleReset}
+        appMode={appMode}
+        onModeChange={handleModeChange}
+        isCameraActive={isCameraActive}
+      />
       <main className="flex flex-1 flex-col lg:flex-row gap-4 p-4">
         {renderMain()}
-        <DashboardPanel frameData={appState === "ready" ? currentFrame : undefined} />
+        <DashboardPanel frameData={
+          isCameraActive ? currentFrame :
+          appState === "ready" ? currentFrame : undefined
+        } />
       </main>
     </div>
   );
