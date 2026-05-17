@@ -309,6 +309,16 @@ function StatusBanner({
   label: string;
   progress: number | null;
 }) {
+  const getStageLabel = (p: number) => {
+    if (p < 10) return "Detecting holds...";
+    if (p < 30) return "Building hold map...";
+    if (p < 50) return "Detecting route...";
+    if (p < 90) return "Analyzing frames...";
+    return "Finishing up...";
+  };
+
+  const pct = progress ?? 0;
+
   return (
     <div className="rounded-lg bg-accent/10 border border-accent/30 px-4 py-3 flex flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -316,18 +326,17 @@ function StatusBanner({
           <span className="inline-block h-2 w-2 rounded-full bg-accent animate-pulse" />
           <span className="text-sm text-accent font-medium">{label}</span>
         </div>
-        {progress !== null && progress > 0 && (
-          <span className="text-xs font-mono text-accent">{Math.round(progress)}%</span>
-        )}
+        <span className="text-xs font-mono text-accent">{Math.round(pct)}%</span>
       </div>
       {progress !== null && (
-        <div className="h-1.5 rounded-full bg-border overflow-hidden">
-          <div
-            className="h-full rounded-full bg-accent transition-all duration-500"
-            style={{ width: `${Math.max(progress, 2)}%` }}
-          />
-        </div>
+        <span className="text-xs text-muted">{getStageLabel(pct)}</span>
       )}
+      <div className="h-1.5 rounded-full bg-border overflow-hidden">
+        <div
+          className="h-full rounded-full bg-accent transition-all duration-500"
+          style={{ width: `${Math.max(pct, 2)}%` }}
+        />
+      </div>
     </div>
   );
 }
