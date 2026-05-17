@@ -453,6 +453,34 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
             else:
                 last_good_pose = []
 
+        # Dab detection: check if hands/feet touch non-route holds
+        dabs: list[dict] = []
+        if keypoints and route_color:
+            # Re-detect ALL holds (not filtered) for dab check on redetect frames
+            all_frame_holds = current_frame_holds
+            if idx % _HOLD_REDETECT_INTERVAL == 0 and raw_holds:
+                all_frame_holds = frame_holds  # unfiltered holds from redetect
+
+            for kp in keypoints:
+                if kp.name not in _CONTACT_KP_NAMES or kp.confidence < 0.3:
+                    continue
+                for h in all_frame_holds:
+                    if h.get("color") == route_color:
+                        continue  # route hold, not a dab
+                    hx, hy = h["x"], h["y"]
+                    hw = h.get("width", 0.05)
+                    hh = h.get("height", 0.05)
+                    half_w = hw / 2 + _CONTACT_MARGIN
+                    half_h = hh / 2 + _CONTACT_MARGIN
+                    if hx - half_w <= kp.x <= hx + half_w and hy - half_h <= kp.y <= hy + half_h:
+                        dabs.append({
+                            "x": h["x"], "y": h["y"],
+                            "width": h.get("width", 0.05),
+                            "height": h.get("height", 0.05),
+                            "hand": "left" if "left" in kp.name else "right",
+                            "body_part": "hand" if "index" in kp.name or "wrist" in kp.name else "foot",
+                        })
+
         # Path prediction
         predictions = []
         if pose_keypoints and current_frame_holds:
@@ -474,6 +502,7 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
             "predictions": predictions,
             "force_distribution": force_dist,
             "route_color": route_color,
+            "dabs": dabs,
         })
 
     cap.release()

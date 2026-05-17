@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import type { FrameData, Hold, PoseKeypoint, Prediction, ForceDistribution } from "@/types";
+import type { FrameData, Hold, PoseKeypoint, Prediction, ForceDistribution, Dab } from "@/types";
 
 // Pose skeleton connections (COCO format pairs)
 const SKELETON_CONNECTIONS: [string, string][] = [
@@ -63,6 +63,28 @@ export default function OverlayRenderer({
         // Label with confidence
         const label = `${(hold.confidence * 100).toFixed(0)}%`;
         ctx.fillText(label, x, y - 4);
+      }
+    },
+    []
+  );
+
+  const drawDabs = useCallback(
+    (ctx: CanvasRenderingContext2D, dabs: Dab[], scaleX: number, scaleY: number) => {
+      if (!dabs || dabs.length === 0) return;
+
+      ctx.strokeStyle = "#ff0000";
+      ctx.lineWidth = 3;
+      ctx.font = "bold 14px monospace";
+      ctx.fillStyle = "#ff0000";
+
+      for (const dab of dabs) {
+        const x = (dab.x - dab.width / 2) * scaleX;
+        const y = (dab.y - dab.height / 2) * scaleY;
+        const w = dab.width * scaleX;
+        const h = dab.height * scaleY;
+
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillText("DAB", x, y - 4);
       }
     },
     []
@@ -330,6 +352,10 @@ export default function OverlayRenderer({
 
     drawHolds(ctx, frameData.holds, scaleX, scaleY);
 
+    if (frameData.dabs) {
+      drawDabs(ctx, frameData.dabs, scaleX, scaleY);
+    }
+
     if (frameData.pose) {
       drawPose(ctx, frameData.pose, scaleX, scaleY);
     }
@@ -342,7 +368,7 @@ export default function OverlayRenderer({
     }
 
     ctx.restore();
-  }, [canvasRef, videoRef, frameData, syncCanvasSize, drawHolds, drawPose, drawPredictions, drawForceDistribution]);
+  }, [canvasRef, videoRef, frameData, syncCanvasSize, drawHolds, drawDabs, drawPose, drawPredictions, drawForceDistribution]);
 
   useEffect(() => {
     const loop = () => {

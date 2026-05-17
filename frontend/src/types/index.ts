@@ -37,6 +37,15 @@ export interface ForceDistribution {
   centerOfMass: { x: number; y: number };
 }
 
+export interface Dab {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  hand: string;
+  body_part: string;
+}
+
 export interface FrameData {
   frameNumber: number;
   timestamp: number;
@@ -46,6 +55,7 @@ export interface FrameData {
   metrics?: FrameMetrics;
   forceDistribution?: ForceDistribution;
   routeColor?: string;
+  dabs?: Dab[];
 }
 
 export interface AnalysisResult {
