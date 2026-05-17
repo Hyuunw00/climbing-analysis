@@ -1,36 +1,80 @@
 """Pose estimation service using MediaPipe Pose."""
 
+import logging
+
 import numpy as np
 import mediapipe as mp
+from mediapipe.tasks import python as mp_python
+from mediapipe.tasks.python import vision
 
 from app.models.schemas import PoseKeypoint
 
+logger = logging.getLogger(__name__)
 
 # MediaPipe landmark indices for hands and feet
 _HAND_INDICES = [15, 16, 17, 18, 19, 20, 21, 22]  # wrists, pinkies, indexes, thumbs
 _FOOT_INDICES = [27, 28, 29, 30, 31, 32]  # ankles, heels, foot indexes
 
+# Landmark names (33 landmarks)
+_LANDMARK_NAMES = [
+    "nose", "left_eye_inner", "left_eye", "left_eye_outer",
+    "right_eye_inner", "right_eye", "right_eye_outer",
+    "left_ear", "right_ear", "mouth_left", "mouth_right",
+    "left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
+    "left_wrist", "right_wrist", "left_pinky", "right_pinky",
+    "left_index", "right_index", "left_thumb", "right_thumb",
+    "left_hip", "right_hip", "left_knee", "right_knee",
+    "left_ankle", "right_ankle", "left_heel", "right_heel",
+    "left_foot_index", "right_foot_index",
+]
+
+# Model download URL
+_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task"
+_MODEL_PATH = "models/pose_landmarker.task"
+
+
+def _ensure_model() -> str | None:
+    """Download pose landmarker model if not present."""
+    import os
+    if os.path.exists(_MODEL_PATH):
+        return _MODEL_PATH
+
+    os.makedirs(os.path.dirname(_MODEL_PATH), exist_ok=True)
+    try:
+        import urllib.request
+        logger.info("Downloading pose landmarker model...")
+        urllib.request.urlretrieve(_MODEL_URL, _MODEL_PATH)
+        logger.info("Model downloaded to %s", _MODEL_PATH)
+        return _MODEL_PATH
+    except Exception as e:
+        logger.error("Failed to download pose model: %s", e)
+        return None
+
 
 class PoseEstimator:
-    """Wraps MediaPipe Pose for single-frame inference.
+    """Wraps MediaPipe PoseLandmarker (Tasks API) for single-frame inference.
 
     Initializes the model once and reuses across frames.
     """
 
-    def __init__(
-        self,
-        static_image_mode: bool = False,
-        model_complexity: int = 1,
-        min_detection_confidence: float = 0.5,
-        min_tracking_confidence: float = 0.5,
-    ) -> None:
-        self._pose = mp.solutions.pose.Pose(
-            static_image_mode=static_image_mode,
-            model_complexity=model_complexity,
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence,
-        )
-        self._landmark_names: list[str] = [lm.name.lower() for lm in mp.solutions.pose.PoseLandmark]
+    def __init__(self) -> None:
+        model_path = _ensure_model()
+        self._available = False
+
+        if model_path is None:
+            logger.warning("Pose estimation unavailable — model not found")
+            return
+
+        try:
+            base_options = mp_python.BaseOptions(model_asset_path=model_path)
+            options = vision.PoseLandmarkerOptions(
+                base_options=base_options,
+                num_poses=1,
+            )
+            self._landmarker = vision.PoseLandmarker.create_from_options(options)
+            self._available = True
+        except Exception as e:
+            logger.error("Failed to initialize PoseLandmarker: %s", e)
 
     def estimate(self, frame_rgb: np.ndarray) -> list[PoseKeypoint]:
         """Run pose estimation on a single RGB frame.
@@ -41,24 +85,34 @@ class PoseEstimator:
         Returns:
             List of 33 PoseKeypoint items, or empty list if detection fails.
         """
-        results = self._pose.process(frame_rgb)
-
-        if results.pose_landmarks is None:
+        if not self._available:
             return []
 
-        keypoints: list[PoseKeypoint] = []
-        for idx, landmark in enumerate(results.pose_landmarks.landmark):
-            keypoints.append(
-                PoseKeypoint(
-                    name=self._landmark_names[idx],
-                    x=landmark.x,
-                    y=landmark.y,
-                    z=landmark.z,
-                    visibility=landmark.visibility,
-                    confidence=landmark.visibility,
+        try:
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+            result = self._landmarker.detect(mp_image)
+
+            if not result.pose_landmarks or len(result.pose_landmarks) == 0:
+                return []
+
+            landmarks = result.pose_landmarks[0]
+            keypoints: list[PoseKeypoint] = []
+            for idx, landmark in enumerate(landmarks):
+                name = _LANDMARK_NAMES[idx] if idx < len(_LANDMARK_NAMES) else f"landmark_{idx}"
+                keypoints.append(
+                    PoseKeypoint(
+                        name=name,
+                        x=landmark.x,
+                        y=landmark.y,
+                        z=landmark.z,
+                        visibility=landmark.visibility,
+                        confidence=landmark.visibility,
+                    )
                 )
-            )
-        return keypoints
+            return keypoints
+        except Exception as e:
+            logger.error("Pose estimation failed: %s", e)
+            return []
 
     def extract_hands(self, keypoints: list[PoseKeypoint]) -> list[PoseKeypoint]:
         """Extract hand/wrist keypoints from full pose."""
@@ -74,7 +128,8 @@ class PoseEstimator:
 
     def close(self) -> None:
         """Release MediaPipe resources."""
-        self._pose.close()
+        if self._available:
+            self._landmarker.close()
 
     def __del__(self) -> None:
         self.close()
