@@ -1,0 +1,6 @@
+# Bouldering completion videos for ML training data
+# One URL per line. Lines starting with # are ignored.
+# Search: "bouldering send", "bouldering top", "V3 completion", "V4 flash", etc.
+#
+# Example:
+# https://www.youtube.com/watch?v=XXXXXXXXXXX
