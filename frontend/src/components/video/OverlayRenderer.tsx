@@ -70,6 +70,27 @@ export default function OverlayRenderer({
 
   const drawPose = useCallback(
     (ctx: CanvasRenderingContext2D, pose: PoseKeypoint[], scaleX: number, scaleY: number) => {
+      const visible = pose.filter((kp) => kp.confidence >= 0.3);
+      if (visible.length === 0) return;
+
+      // Draw person bounding box
+      const xs = visible.map((kp) => kp.x * scaleX);
+      const ys = visible.map((kp) => kp.y * scaleY);
+      const pad = 16;
+      const minX = Math.min(...xs) - pad;
+      const minY = Math.min(...ys) - pad;
+      const maxX = Math.max(...xs) + pad;
+      const maxY = Math.max(...ys) + pad;
+
+      ctx.strokeStyle = "#00ff88";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+
+      // Label
+      ctx.font = "bold 13px monospace";
+      ctx.fillStyle = "#00ff88";
+      ctx.fillText("CLIMBER", minX + 4, minY - 6);
+
       // Draw connections
       ctx.strokeStyle = "#00ff88";
       ctx.lineWidth = 2;
@@ -158,9 +179,36 @@ export default function OverlayRenderer({
 
     if (!frameData) return;
 
-    // Scale from video natural size to canvas display size
-    const scaleX = canvas.width / (video.videoWidth || 1);
-    const scaleY = canvas.height / (video.videoHeight || 1);
+    const vw = video.videoWidth || 1;
+    const vh = video.videoHeight || 1;
+    const cw = canvas.width;
+    const ch = canvas.height;
+
+    // Calculate actual video rendering area (handles letterboxing from object-fit: contain)
+    const videoAspect = vw / vh;
+    const canvasAspect = cw / ch;
+
+    let renderW: number, renderH: number, offsetX: number, offsetY: number;
+    if (canvasAspect > videoAspect) {
+      // Pillarboxed (black bars on sides)
+      renderH = ch;
+      renderW = ch * videoAspect;
+      offsetX = (cw - renderW) / 2;
+      offsetY = 0;
+    } else {
+      // Letterboxed (black bars top/bottom)
+      renderW = cw;
+      renderH = cw / videoAspect;
+      offsetX = 0;
+      offsetY = (ch - renderH) / 2;
+    }
+
+    const scaleX = renderW;
+    const scaleY = renderH;
+
+    // Save context and translate to video rendering origin
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
 
     drawHolds(ctx, frameData.holds, scaleX, scaleY);
 
@@ -169,6 +217,8 @@ export default function OverlayRenderer({
     }
 
     drawPredictions(ctx, frameData.predictions, frameData.holds, frameData.pose, scaleX, scaleY);
+
+    ctx.restore();
   }, [canvasRef, videoRef, frameData, syncCanvasSize, drawHolds, drawPose, drawPredictions]);
 
   useEffect(() => {
