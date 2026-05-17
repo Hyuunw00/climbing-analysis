@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import type { FrameData, Hold, PoseKeypoint, Prediction } from "@/types";
+import type { FrameData, Hold, PoseKeypoint, Prediction, ForceDistribution } from "@/types";
 
 // Pose skeleton connections (COCO format pairs)
 const SKELETON_CONNECTIONS: [string, string][] = [
@@ -118,6 +118,124 @@ export default function OverlayRenderer({
     []
   );
 
+  // Map limb names to pose keypoint names
+  const LIMB_KEYPOINTS: Record<string, string> = {
+    leftHand: "left_wrist",
+    rightHand: "right_wrist",
+    leftFoot: "left_ankle",
+    rightFoot: "right_ankle",
+  };
+
+  /**
+   * Interpolate green (#00ff88) → yellow (#ffff00) → red (#ff4444) based on value 0..1
+   */
+  const forceColor = useCallback((ratio: number): string => {
+    const t = Math.max(0, Math.min(1, ratio));
+    if (t < 0.5) {
+      // green → yellow
+      const s = t / 0.5;
+      const r = Math.round(0x00 + (0xff - 0x00) * s);
+      const g = Math.round(0xff);
+      const b = Math.round(0x88 * (1 - s));
+      return `rgb(${r},${g},${b})`;
+    }
+    // yellow → red
+    const s = (t - 0.5) / 0.5;
+    const r = 0xff;
+    const g = Math.round(0xff * (1 - s) + 0x44 * s);
+    const b = Math.round(0x44 * s);
+    return `rgb(${r},${g},${b})`;
+  }, []);
+
+  const drawForceDistribution = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      fd: ForceDistribution,
+      pose: PoseKeypoint[],
+      scaleX: number,
+      scaleY: number,
+    ) => {
+      const visible = pose.filter((kp) => kp.confidence >= 0.3);
+      if (visible.length === 0) return;
+
+      const limbs: { key: keyof typeof LIMB_KEYPOINTS; value: number }[] = [
+        { key: "leftHand", value: fd.leftHand },
+        { key: "rightHand", value: fd.rightHand },
+        { key: "leftFoot", value: fd.leftFoot },
+        { key: "rightFoot", value: fd.rightFoot },
+      ];
+
+      const maxRadius = 28;
+      const minRadius = 8;
+
+      for (const { key, value } of limbs) {
+        const kpName = LIMB_KEYPOINTS[key];
+        const kp = pose.find((p) => p.name === kpName);
+        if (!kp || kp.confidence < 0.3) continue;
+
+        const cx = kp.x * scaleX;
+        const cy = kp.y * scaleY;
+        const ratio = value / 100;
+        const radius = minRadius + (maxRadius - minRadius) * ratio;
+        const color = forceColor(ratio);
+
+        // Semi-transparent filled circle
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color.replace("rgb", "rgba").replace(")", ",0.35)");
+        ctx.fill();
+
+        // Border ring
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Percentage label
+        const label = `${Math.round(value)}%`;
+        ctx.font = "bold 11px monospace";
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, cx, cy);
+      }
+
+      // Draw center of mass crosshair
+      if (fd.centerOfMass) {
+        const comX = fd.centerOfMass.x * scaleX;
+        const comY = fd.centerOfMass.y * scaleY;
+        const size = 8;
+
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+
+        // Horizontal line
+        ctx.beginPath();
+        ctx.moveTo(comX - size, comY);
+        ctx.lineTo(comX + size, comY);
+        ctx.stroke();
+
+        // Vertical line
+        ctx.beginPath();
+        ctx.moveTo(comX, comY - size);
+        ctx.lineTo(comX, comY + size);
+        ctx.stroke();
+
+        // Small circle at center
+        ctx.beginPath();
+        ctx.arc(comX, comY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+      }
+
+      // Reset text alignment
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
+    },
+    [forceColor],
+  );
+
   const drawPredictions = useCallback(
     (
       ctx: CanvasRenderingContext2D,
@@ -218,8 +336,13 @@ export default function OverlayRenderer({
 
     drawPredictions(ctx, frameData.predictions, frameData.holds, frameData.pose, scaleX, scaleY);
 
+    // Force distribution overlay
+    if (frameData.forceDistribution && frameData.pose) {
+      drawForceDistribution(ctx, frameData.forceDistribution, frameData.pose, scaleX, scaleY);
+    }
+
     ctx.restore();
-  }, [canvasRef, videoRef, frameData, syncCanvasSize, drawHolds, drawPose, drawPredictions]);
+  }, [canvasRef, videoRef, frameData, syncCanvasSize, drawHolds, drawPose, drawPredictions, drawForceDistribution]);
 
   useEffect(() => {
     const loop = () => {

@@ -20,12 +20,32 @@ export interface Prediction {
   hand?: string; // "left" or "right"
 }
 
+export interface FrameMetrics {
+  smoothness: number;
+  technique: number;
+  stable: number;
+  adhesion: number;
+  score: number;
+  verticalVelocity: number;
+}
+
+export interface ForceDistribution {
+  leftHand: number;
+  rightHand: number;
+  leftFoot: number;
+  rightFoot: number;
+  centerOfMass: { x: number; y: number };
+}
+
 export interface FrameData {
   frameNumber: number;
   timestamp: number;
   holds: Hold[];
   pose: PoseKeypoint[] | null;
   predictions: Prediction[];
+  metrics?: FrameMetrics;
+  forceDistribution?: ForceDistribution;
+  routeColor?: string;
 }
 
 export interface AnalysisResult {

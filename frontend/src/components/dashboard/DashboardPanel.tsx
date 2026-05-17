@@ -2,6 +2,19 @@
 
 import type { FrameData } from "@/types";
 
+// Color map for route color labels
+const ROUTE_COLOR_MAP: Record<string, { color: string; label: string }> = {
+  red: { color: "#ef4444", label: "Red" },
+  blue: { color: "#3b82f6", label: "Blue" },
+  green: { color: "#22c55e", label: "Green" },
+  yellow: { color: "#eab308", label: "Yellow" },
+  orange: { color: "#f97316", label: "Orange" },
+  pink: { color: "#ec4899", label: "Pink" },
+  purple: { color: "#a855f7", label: "Purple" },
+  white: { color: "#f5f5f5", label: "White" },
+  black: { color: "#1a1a1a", label: "Black" },
+};
+
 // Dashboard metrics type
 export interface DashboardData {
   routeColor: { color: string; label: string };
@@ -31,39 +44,26 @@ export const EMPTY_DASHBOARD_DATA: DashboardData = {
 };
 
 /**
- * Derive dashboard metrics from a single analysis frame.
- * These are approximations — a real scoring model would live on the backend.
+ * Build dashboard data from backend metrics attached to a frame.
+ * Falls back to zeros when metrics are not available.
  */
-function deriveFromFrame(frame: FrameData): DashboardData {
-  const holdsCount = frame.holds.length;
-  const avgHoldConfidence =
-    holdsCount > 0
-      ? frame.holds.reduce((sum, h) => sum + h.confidence, 0) / holdsCount
-      : 0;
+function buildFromFrame(frame: FrameData): DashboardData {
+  const m = frame.metrics;
 
-  const poseCount = frame.pose?.length ?? 0;
-  const avgPoseConfidence =
-    poseCount > 0
-      ? (frame.pose ?? []).reduce((sum, kp) => sum + kp.confidence, 0) / poseCount
-      : 0;
-
-  const topPrediction =
-    frame.predictions.length > 0
-      ? Math.max(...frame.predictions.map((p) => p.probability))
-      : 0;
-
-  const smoothness = Math.round(avgPoseConfidence * 100);
-  const technique = Math.round(topPrediction * 100);
-  const stable = Math.round(avgPoseConfidence * 80);
-  const adhesion = Math.round(avgHoldConfidence * 100);
-  const liveScore = Math.round((smoothness + technique + stable + adhesion) / 4);
+  const routeKey = frame.routeColor?.toLowerCase() ?? "";
+  const routeColor = ROUTE_COLOR_MAP[routeKey] ?? { color: "#666", label: frame.routeColor ?? "N/A" };
 
   return {
-    routeColor: { color: "#3b82f6", label: `${holdsCount} holds detected` },
-    verticalVelocity: 0, // Requires multi-frame calculation
-    performance: { smoothness, technique, stable, adhesion },
-    liveScore,
-    avgScore: liveScore,
+    routeColor,
+    verticalVelocity: m?.verticalVelocity ?? 0,
+    performance: {
+      smoothness: m?.smoothness ?? 0,
+      technique: m?.technique ?? 0,
+      stable: m?.stable ?? 0,
+      adhesion: m?.adhesion ?? 0,
+    },
+    liveScore: m?.score ?? 0,
+    avgScore: m?.score ?? 0,
   };
 }
 
@@ -97,8 +97,8 @@ const SCORE_SEGMENTS = [
 ];
 
 export default function DashboardPanel({ data, frameData }: DashboardPanelProps) {
-  // Priority: explicit data > derived from frameData > empty placeholder
-  const resolvedData = data ?? (frameData ? deriveFromFrame(frameData) : EMPTY_DASHBOARD_DATA);
+  // Priority: explicit data > built from backend metrics > empty placeholder
+  const resolvedData = data ?? (frameData ? buildFromFrame(frameData) : EMPTY_DASHBOARD_DATA);
   const grade = getGrade(resolvedData.avgScore);
 
   return (

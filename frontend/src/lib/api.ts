@@ -55,6 +55,22 @@ interface RawFrameData {
     probability: number;
     hand: string;
   }>;
+  metrics?: {
+    smoothness: number;
+    technique: number;
+    stable: number;
+    adhesion: number;
+    score: number;
+    vertical_velocity: number;
+  };
+  force_distribution?: {
+    left_hand: number;
+    right_hand: number;
+    left_foot: number;
+    right_foot: number;
+    center_of_mass: { x: number; y: number };
+  };
+  route_color?: string;
 }
 
 interface RawAnalysisResult {
@@ -93,6 +109,26 @@ function mapFrame(raw: RawFrameData): FrameData {
       probability: p.probability,
       hand: p.hand,
     })),
+    metrics: raw.metrics
+      ? {
+          smoothness: raw.metrics.smoothness,
+          technique: raw.metrics.technique,
+          stable: raw.metrics.stable,
+          adhesion: raw.metrics.adhesion,
+          score: raw.metrics.score,
+          verticalVelocity: raw.metrics.vertical_velocity,
+        }
+      : undefined,
+    forceDistribution: raw.force_distribution
+      ? {
+          leftHand: raw.force_distribution.left_hand,
+          rightHand: raw.force_distribution.right_hand,
+          leftFoot: raw.force_distribution.left_foot,
+          rightFoot: raw.force_distribution.right_foot,
+          centerOfMass: raw.force_distribution.center_of_mass,
+        }
+      : undefined,
+    routeColor: raw.route_color,
   };
 }
 
