@@ -9,7 +9,6 @@ import logging
 from dataclasses import dataclass
 
 import cv2
-import numpy as np
 
 from app.config import settings
 from app.services.hold_detector import hold_detector

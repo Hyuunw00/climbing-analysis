@@ -11,10 +11,6 @@ from app.models.schemas import PoseKeypoint
 
 logger = logging.getLogger(__name__)
 
-# MediaPipe landmark indices for hands and feet
-_HAND_INDICES = [15, 16, 17, 18, 19, 20, 21, 22]  # wrists, pinkies, indexes, thumbs
-_FOOT_INDICES = [27, 28, 29, 30, 31, 32]  # ankles, heels, foot indexes
-
 # Landmark names (33 landmarks)
 _LANDMARK_NAMES = [
     "nose", "left_eye_inner", "left_eye", "left_eye_outer",
@@ -113,18 +109,6 @@ class PoseEstimator:
         except Exception as e:
             logger.error("Pose estimation failed: %s", e)
             return []
-
-    def extract_hands(self, keypoints: list[PoseKeypoint]) -> list[PoseKeypoint]:
-        """Extract hand/wrist keypoints from full pose."""
-        if not keypoints:
-            return []
-        return [keypoints[i] for i in _HAND_INDICES if i < len(keypoints)]
-
-    def extract_feet(self, keypoints: list[PoseKeypoint]) -> list[PoseKeypoint]:
-        """Extract foot/ankle keypoints from full pose."""
-        if not keypoints:
-            return []
-        return [keypoints[i] for i in _FOOT_INDICES if i < len(keypoints)]
 
     def close(self) -> None:
         """Release MediaPipe resources."""

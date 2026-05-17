@@ -8,12 +8,6 @@ import cv2
 import numpy as np
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.models.schemas import (
-    FrameData,
-    ForceDistribution,
-    Hold,
-    Prediction,
-)
 from app.services.hold_detector import hold_detector
 from app.services.pose_estimator import PoseEstimator
 from app.services.path_predictor import predict_next_holds

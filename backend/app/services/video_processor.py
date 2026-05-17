@@ -361,10 +361,6 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
         route_holds = [h for h in hold_map if h.get("color") == route_color]
         logger.info("Route holds: %d/%d (color=%s)", len(route_holds), len(hold_map), route_color)
 
-    # Free scan frame memory
-    del scan_frames_bgr
-    del all_hold_detections
-
     # ── Phase 3: Per-frame analysis with fixed hold map ─────────────
     frame_results: list[dict] = []
 

@@ -183,7 +183,6 @@ def extract_features(
         features["hold_percentile_y"] = 0.5
 
     # ── Symmetry ──
-    features["same_side"] = features["lateral_match"]
     if other_wrist:
         features["cross_body_dist"] = _dist(other_wrist.x, other_wrist.y, hx, hy)
     else:
@@ -253,7 +252,7 @@ FEATURE_NAMES: list[str] = [
     "com_x", "com_y", "com_to_hold", "com_to_hold_angle",
     "hold_width", "hold_height", "hold_area", "hold_confidence",
     "rank_by_distance", "rank_by_vertical_gain", "hold_percentile_x", "hold_percentile_y",
-    "same_side", "cross_body_dist",
+    "cross_body_dist",
     "other_hand_nearest_hold", "feet_avg_y", "hands_spread",
     "body_tilt", "torso_length", "hip_angle",
     "wrist_x", "wrist_y", "com_progress",

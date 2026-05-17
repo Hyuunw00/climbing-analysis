@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Wrist keypoint names
 _WRIST_NAMES = {"left": "left_wrist", "right": "right_wrist"}
 
-TOP_N = 3
+_TOP_N = 3
 _MIN_VISIBILITY = 0.3
 
 
@@ -94,7 +94,7 @@ class MLPathPredictor:
             probabilities = self._model.predict_proba(X)[:, 1]
 
             # Sort by probability, take top N
-            indices = np.argsort(probabilities)[::-1][:TOP_N]
+            indices = np.argsort(probabilities)[::-1][:_TOP_N]
 
             # Normalize top N probabilities to sum to ~100
             top_probs = probabilities[indices]
