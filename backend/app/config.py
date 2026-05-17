@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     frame_rate: int = 5
 
     # Hold detection model
-    hold_model_path: str = "models/hold_detector.pt"
+    hold_model_path: str = "models/yolov8n-freeclimbs-detect-2.pt"
     hold_confidence_threshold: float = 0.5
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

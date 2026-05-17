@@ -105,14 +105,16 @@ def process_video(file_path: str) -> dict:
 
             # Hold detection (operates on BGR)
             raw_holds = hold_detector.detect(frame_bgr)
+            img_h, img_w = frame_bgr.shape[:2]
             for i, h in enumerate(raw_holds):
+                # Normalize pixel coords to 0-1 (matching pose coords)
                 detected_holds.append(
                     {
                         "id": f"hold_{frame_number}_{i}",
-                        "x": h["x"],
-                        "y": h["y"],
-                        "width": h["width"],
-                        "height": h["height"],
+                        "x": h["x"] / img_w,
+                        "y": h["y"] / img_h,
+                        "width": h["width"] / img_w,
+                        "height": h["height"] / img_h,
                         "confidence": h["confidence"],
                     }
                 )
