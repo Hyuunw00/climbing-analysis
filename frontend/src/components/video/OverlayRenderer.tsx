@@ -61,7 +61,7 @@ export default function OverlayRenderer({
 
         ctx.strokeRect(x, y, w, h);
         // Label with confidence
-        const label = `hold ${(hold.confidence * 100).toFixed(0)}%`;
+        const label = `${(hold.confidence * 100).toFixed(0)}%`;
         ctx.fillText(label, x, y - 4);
       }
     },
@@ -175,7 +175,7 @@ export default function OverlayRenderer({
 
         const cx = kp.x * scaleX;
         const cy = kp.y * scaleY;
-        const ratio = value / 100;
+        const ratio = Math.max(0, Math.min(1, value)); // value is already 0-1
         const radius = minRadius + (maxRadius - minRadius) * ratio;
         const color = forceColor(ratio);
 
@@ -193,7 +193,7 @@ export default function OverlayRenderer({
         ctx.stroke();
 
         // Percentage label
-        const label = `${Math.round(value)}%`;
+        const label = `${Math.round(value * 100)}%`;
         ctx.font = "bold 11px monospace";
         ctx.fillStyle = "#ffffff";
         ctx.textAlign = "center";
@@ -276,7 +276,7 @@ export default function OverlayRenderer({
         // Probability label
         const midX = (startX + endX) / 2;
         const midY = (startY + endY) / 2;
-        ctx.fillText(`${(pred.probability * 100).toFixed(0)}%`, midX + 4, midY - 4);
+        ctx.fillText(`${pred.probability.toFixed(0)}%`, midX + 4, midY - 4);
       }
 
       ctx.setLineDash([]);

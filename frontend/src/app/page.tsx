@@ -289,10 +289,13 @@ export default function Home() {
       />
       <main className="flex flex-1 flex-col lg:flex-row gap-2 sm:gap-4 p-2 sm:p-4">
         {renderMain()}
-        <DashboardPanel frameData={
-          isCameraActive ? currentFrame :
-          appState === "ready" ? currentFrame : undefined
-        } />
+        <DashboardPanel
+          frameData={
+            isCameraActive ? currentFrame :
+            appState === "ready" ? currentFrame : undefined
+          }
+          allFrames={appState === "ready" ? analysisResult?.frames : undefined}
+        />
       </main>
     </div>
   );

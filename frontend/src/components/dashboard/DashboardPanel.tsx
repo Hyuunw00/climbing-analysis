@@ -11,6 +11,11 @@ const ROUTE_COLOR_MAP: Record<string, { color: string; label: string }> = {
   orange: { color: "#f97316", label: "Orange" },
   pink: { color: "#ec4899", label: "Pink" },
   purple: { color: "#a855f7", label: "Purple" },
+  mint: { color: "#2dd4bf", label: "Mint" },
+  lime: { color: "#84cc16", label: "Lime" },
+  brown: { color: "#a16207", label: "Brown" },
+  beige: { color: "#d4a574", label: "Beige" },
+  gray: { color: "#9ca3af", label: "Gray" },
   white: { color: "#f5f5f5", label: "White" },
   black: { color: "#1a1a1a", label: "Black" },
 };
@@ -70,6 +75,7 @@ function buildFromFrame(frame: FrameData): DashboardData {
 interface DashboardPanelProps {
   data?: DashboardData;
   frameData?: FrameData | null;
+  allFrames?: FrameData[];
 }
 
 // Score grade based on value
@@ -96,9 +102,16 @@ const SCORE_SEGMENTS = [
   { min: 75, max: 100, color: "#00ff88", label: "A" },
 ];
 
-export default function DashboardPanel({ data, frameData }: DashboardPanelProps) {
-  // Priority: explicit data > built from backend metrics > empty placeholder
-  const resolvedData = data ?? (frameData ? buildFromFrame(frameData) : EMPTY_DASHBOARD_DATA);
+export default function DashboardPanel({ data, frameData, allFrames }: DashboardPanelProps) {
+  // Compute average score across all analyzed frames
+  const avgScoreAll = allFrames && allFrames.length > 0
+    ? allFrames.reduce((sum, f) => sum + (f.metrics?.score ?? 0), 0) / allFrames.length
+    : undefined;
+
+  const baseData = data ?? (frameData ? buildFromFrame(frameData) : EMPTY_DASHBOARD_DATA);
+  const resolvedData = avgScoreAll !== undefined
+    ? { ...baseData, avgScore: Math.round(avgScoreAll * 10) / 10 }
+    : baseData;
   const grade = getGrade(resolvedData.avgScore);
 
   return (

@@ -67,9 +67,9 @@ export default function VideoPlayer({ src, onReset, frameData = null, onTimeUpda
   }, [onTimeUpdate]);
 
   return (
-    <div className="flex flex-1 flex-col gap-3 min-h-[200px] sm:min-h-[300px] lg:min-h-0">
+    <div className="flex flex-col gap-2 sm:gap-3 lg:flex-1 lg:min-h-0">
       {/* Video container with canvas overlay */}
-      <div className="relative flex-1 rounded-lg overflow-hidden bg-black">
+      <div className="relative aspect-[3/4] sm:aspect-video lg:aspect-auto lg:flex-1 rounded-lg overflow-hidden bg-black">
         <video
           ref={videoRef}
           src={src}
