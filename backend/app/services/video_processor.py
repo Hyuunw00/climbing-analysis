@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from app.config import settings
 from app.services.hold_detector import hold_detector
+from app.services.path_predictor import predict_next_holds
 from app.services.pose_estimator import PoseEstimator
 
 logger = logging.getLogger(__name__)
@@ -116,13 +117,22 @@ def process_video(file_path: str) -> dict:
                     }
                 )
 
+        # Path prediction based on current pose and holds
+        predictions = []
+        if pose_keypoints and detected_holds:
+            from app.models.schemas import PoseKeypoint as PK
+
+            kps = [PK(**kp) for kp in pose_keypoints]
+            raw_preds = predict_next_holds(kps, detected_holds)
+            predictions = [p.model_dump() for p in raw_preds]
+
         frame_results.append(
             {
                 "frame_number": frame_number,
                 "timestamp": timestamp,
                 "holds": detected_holds,
                 "pose": pose_keypoints,
-                "predictions": [],
+                "predictions": predictions,
             }
         )
 

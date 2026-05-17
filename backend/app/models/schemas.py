@@ -28,6 +28,7 @@ class Prediction(BaseModel):
 
     hold_id: str
     probability: float
+    hand: str  # "left" or "right"
 
 
 class FrameData(BaseModel):
