@@ -102,7 +102,7 @@ export default function DashboardPanel({ data, frameData }: DashboardPanelProps)
   const grade = getGrade(resolvedData.avgScore);
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border bg-panel p-4 lg:w-80 overflow-y-auto">
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-panel p-4 w-full lg:w-80 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
       <h2 className="text-sm font-bold tracking-widest uppercase text-accent">
         Climbing Analytics
       </h2>
@@ -190,7 +190,7 @@ export default function DashboardPanel({ data, frameData }: DashboardPanelProps)
               className="flex-1 relative"
               style={{ backgroundColor: seg.color }}
             >
-              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-black/70">
+              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-black/70">
                 {seg.label}
               </span>
             </div>

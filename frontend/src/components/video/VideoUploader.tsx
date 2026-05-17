@@ -108,7 +108,7 @@ export default function VideoUploader({ onVideoSelect, onUrlSubmit }: VideoUploa
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      className={`flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed min-h-[300px] lg:min-h-0 transition-colors cursor-pointer ${
+      className={`flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed min-h-[200px] sm:min-h-[300px] lg:min-h-0 transition-colors cursor-pointer ${
         isDragging
           ? "border-accent bg-accent/5"
           : "border-border bg-panel hover:border-muted"
@@ -135,7 +135,8 @@ export default function VideoUploader({ onVideoSelect, onUrlSubmit }: VideoUploa
 
       <div className="flex flex-col items-center gap-1 text-center px-4">
         <p className="text-sm text-foreground font-medium">
-          Drop your climbing video here
+          <span className="hidden sm:inline">Drop your climbing video here</span>
+          <span className="sm:hidden">Tap to select your climbing video</span>
         </p>
         <p className="text-xs text-muted">
           MP4, MOV, or WebM — max 2 min, 100MB
@@ -144,7 +145,7 @@ export default function VideoUploader({ onVideoSelect, onUrlSubmit }: VideoUploa
 
       <button
         type="button"
-        className="mt-2 px-4 py-2 rounded-md bg-accent text-background text-sm font-medium hover:bg-accent/90 transition-colors"
+        className="mt-2 px-4 py-3 sm:py-2 rounded-md bg-accent text-background text-sm font-medium hover:bg-accent/90 transition-colors"
         onClick={(e) => {
           e.stopPropagation();
           inputRef.current?.click();
@@ -191,7 +192,7 @@ export default function VideoUploader({ onVideoSelect, onUrlSubmit }: VideoUploa
             or paste a video URL (YouTube, Instagram, etc.)
           </p>
           <form
-            className="flex gap-2 max-w-md mx-auto"
+            className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto"
             onSubmit={(e) => {
               e.preventDefault();
               const trimmed = urlInput.trim();
@@ -216,7 +217,7 @@ export default function VideoUploader({ onVideoSelect, onUrlSubmit }: VideoUploa
             <button
               type="submit"
               disabled={urlLoading || !urlInput.trim()}
-              className="px-4 py-2 rounded-md bg-accent text-background text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+              className="px-4 py-3 sm:py-2 rounded-md bg-accent text-background text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
             >
               {urlLoading ? "Loading..." : "Analyze"}
             </button>

@@ -241,7 +241,7 @@ export default function Home() {
     }
 
     return (
-      <div className="flex flex-1 flex-col gap-3 min-h-[300px] lg:min-h-0">
+      <div className="flex flex-1 flex-col gap-3 min-h-[200px] sm:min-h-[300px] lg:min-h-0">
         {/* Status banner */}
         {appState === "uploading" && (
           <StatusBanner
@@ -287,7 +287,7 @@ export default function Home() {
         onModeChange={handleModeChange}
         isCameraActive={isCameraActive}
       />
-      <main className="flex flex-1 flex-col lg:flex-row gap-4 p-4">
+      <main className="flex flex-1 flex-col lg:flex-row gap-2 sm:gap-4 p-2 sm:p-4">
         {renderMain()}
         <DashboardPanel frameData={
           isCameraActive ? currentFrame :

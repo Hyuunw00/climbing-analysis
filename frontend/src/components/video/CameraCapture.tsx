@@ -208,7 +208,7 @@ export default function CameraCapture({ onFrameData, onStop }: CameraCaptureProp
   // Error state
   if (cameraState === "error") {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border border-border bg-panel p-8 min-h-[300px]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border border-border bg-panel p-8 min-h-[250px] sm:min-h-[300px]">
         <svg className="w-12 h-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M12 18.75H4.5a2.25 2.25 0 01-2.25-2.25V7.5A2.25 2.25 0 014.5 5.25h7.5" />
           <line x1="2" y1="2" x2="22" y2="22" strokeWidth={1.5} strokeLinecap="round" />
@@ -217,7 +217,7 @@ export default function CameraCapture({ onFrameData, onStop }: CameraCaptureProp
         <button
           type="button"
           onClick={onStop}
-          className="text-xs font-mono px-3 py-1.5 rounded border border-border hover:bg-border transition-colors text-muted hover:text-foreground"
+          className="text-sm sm:text-xs font-mono px-4 sm:px-3 py-2 sm:py-1.5 rounded border border-border hover:bg-border transition-colors text-muted hover:text-foreground"
         >
           Back to Upload
         </button>
@@ -228,7 +228,7 @@ export default function CameraCapture({ onFrameData, onStop }: CameraCaptureProp
   // Initializing state
   if (cameraState === "initializing") {
     return (
-      <div className="flex flex-1 items-center justify-center rounded-lg border border-border bg-panel min-h-[300px]">
+      <div className="flex flex-1 items-center justify-center rounded-lg border border-border bg-panel min-h-[250px] sm:min-h-[300px]">
         <div className="flex flex-col items-center gap-3">
           <span className="inline-block h-3 w-3 rounded-full bg-accent animate-pulse" />
           <span className="text-sm text-muted font-mono">Requesting camera access...</span>
@@ -238,7 +238,7 @@ export default function CameraCapture({ onFrameData, onStop }: CameraCaptureProp
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-3 min-h-[300px] lg:min-h-0">
+    <div className="flex flex-1 flex-col gap-3 min-h-[250px] sm:min-h-[300px] lg:min-h-0">
       {/* Camera view with overlay */}
       <div className="relative flex-1 rounded-lg overflow-hidden bg-black">
         <video
@@ -261,12 +261,13 @@ export default function CameraCapture({ onFrameData, onStop }: CameraCaptureProp
         />
 
         {/* LIVE badge */}
-        <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded px-2 py-1">
-          <span className="relative flex h-2 w-2">
+        {/* LIVE badge - larger on mobile for visibility */}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded px-2.5 sm:px-2 py-1.5 sm:py-1">
+          <span className="relative flex h-2.5 sm:h-2 w-2.5 sm:w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+            <span className="relative inline-flex h-2.5 sm:h-2 w-2.5 sm:w-2 rounded-full bg-red-500" />
           </span>
-          <span className="text-xs font-bold tracking-wider text-red-400">LIVE</span>
+          <span className="text-sm sm:text-xs font-bold tracking-wider text-red-400">LIVE</span>
         </div>
 
         {/* WebSocket status */}
@@ -299,7 +300,7 @@ export default function CameraCapture({ onFrameData, onStop }: CameraCaptureProp
         <button
           type="button"
           onClick={onStop}
-          className="text-xs font-mono px-2 py-1 rounded border border-border hover:bg-border transition-colors text-muted hover:text-foreground"
+          className="text-sm sm:text-xs font-mono px-4 sm:px-2 py-2 sm:py-1 min-h-[44px] sm:min-h-0 rounded border border-border hover:bg-border transition-colors text-muted hover:text-foreground"
         >
           Stop Camera
         </button>

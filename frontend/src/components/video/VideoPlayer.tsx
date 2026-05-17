@@ -66,7 +66,7 @@ export default function VideoPlayer({ src, onReset, frameData = null, onTimeUpda
   }, [onTimeUpdate]);
 
   return (
-    <div className="flex flex-1 flex-col gap-3 min-h-[300px] lg:min-h-0">
+    <div className="flex flex-1 flex-col gap-3 min-h-[200px] sm:min-h-[300px] lg:min-h-0">
       {/* Video container with canvas overlay */}
       <div className="relative flex-1 rounded-lg overflow-hidden bg-black">
         <video
@@ -93,7 +93,7 @@ export default function VideoPlayer({ src, onReset, frameData = null, onTimeUpda
         <button
           type="button"
           onClick={togglePlay}
-          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-border transition-colors"
+          className="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 rounded-md hover:bg-border transition-colors"
           aria-label={isPlaying ? "Pause" : "Play"}
         >
           {isPlaying ? (
@@ -108,7 +108,7 @@ export default function VideoPlayer({ src, onReset, frameData = null, onTimeUpda
         </button>
 
         {/* Time display */}
-        <span className="text-xs font-mono text-muted min-w-[70px]">
+        <span className="text-sm sm:text-xs font-mono text-muted min-w-[70px]">
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
 

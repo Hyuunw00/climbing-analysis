@@ -21,7 +21,7 @@ export default function Header({ hasVideo, onReset, appMode, onModeChange, isCam
             <button
               type="button"
               onClick={() => onModeChange("upload")}
-              className={`text-xs font-mono px-2.5 py-1 transition-colors ${
+              className={`text-sm sm:text-xs font-mono px-3 sm:px-2.5 py-2 sm:py-1 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 transition-colors ${
                 appMode === "upload"
                   ? "bg-accent text-black"
                   : "text-muted hover:text-foreground"
@@ -32,7 +32,7 @@ export default function Header({ hasVideo, onReset, appMode, onModeChange, isCam
             <button
               type="button"
               onClick={() => onModeChange("camera")}
-              className={`text-xs font-mono px-2.5 py-1 transition-colors ${
+              className={`text-sm sm:text-xs font-mono px-3 sm:px-2.5 py-2 sm:py-1 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 transition-colors ${
                 appMode === "camera"
                   ? "bg-accent text-black"
                   : "text-muted hover:text-foreground"
@@ -47,7 +47,7 @@ export default function Header({ hasVideo, onReset, appMode, onModeChange, isCam
           <button
             type="button"
             onClick={onReset}
-            className="text-xs font-mono px-2 py-1 rounded border border-border hover:bg-panel transition-colors"
+            className="text-sm sm:text-xs font-mono px-3 sm:px-2 py-2 sm:py-1 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 rounded border border-border hover:bg-panel transition-colors"
           >
             New Video
           </button>
