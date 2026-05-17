@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FrameData, Hold, PoseKeypoint, Prediction, ForceDistribution, FrameMetrics } from "@/types";
+import type { FrameData, Hold, PoseKeypoint, Prediction, ForceDistribution } from "@/types";
 import OverlayRenderer from "./OverlayRenderer";
 
 const WS_URL = "ws://localhost:8000/api/realtime";

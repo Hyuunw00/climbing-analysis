@@ -291,8 +291,7 @@ export default function Home() {
         {renderMain()}
         <DashboardPanel
           frameData={
-            isCameraActive ? currentFrame :
-            appState === "ready" ? currentFrame : undefined
+            isCameraActive || appState === "ready" ? currentFrame : undefined
           }
           allFrames={appState === "ready" ? analysisResult?.frames : undefined}
         />
