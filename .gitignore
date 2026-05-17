@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+out/
+
+# PWA generated
+frontend/public/sw.js
+frontend/public/workbox-*.js
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Uploads
+backend/uploads/
+
+# Models (large files)
+backend/models/*.pt
+backend/models/*.onnx
