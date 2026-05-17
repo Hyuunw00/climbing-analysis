@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     # Hold detection model
     hold_model_path: str = "models/yolov8n-freeclimbs-detect-2.pt"
-    hold_confidence_threshold: float = 0.5
+    hold_confidence_threshold: float = 0.45
 
     # URL download
     download_timeout: int = 60  # seconds

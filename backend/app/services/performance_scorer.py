@@ -40,7 +40,7 @@ _HAND_NAMES = ["left_wrist", "right_wrist", "left_index", "right_index"]
 _FOOT_NAMES = ["left_ankle", "right_ankle", "left_foot_index", "right_foot_index"]
 
 # Adhesion: max distance threshold for "inside hold" (normalized coords)
-_ADHESION_DIST_THRESHOLD = 0.06
+_ADHESION_DIST_THRESHOLD = 0.10
 
 # Default score when insufficient data
 _DEFAULT_SCORE = 50.0
@@ -101,6 +101,7 @@ def _calc_smoothness(
     prev_positions: dict[str, tuple[float, float]] | None,
     curr_positions: dict[str, tuple[float, float]],
     next_positions: dict[str, tuple[float, float]] | None,
+    fps_hint: float = 30.0,
 ) -> float:
     """Smoothness from jerk (second derivative of position).
 
@@ -125,8 +126,10 @@ def _calc_smoothness(
         return _DEFAULT_SCORE
 
     avg_jerk = float(np.mean(jerks))
-    # Map jerk to score: jerk=0 → 100, jerk>=0.05 → 0
-    score = 100.0 * (1.0 - min(avg_jerk / 0.05, 1.0))
+    # Scale threshold by frame interval — at low fps, jerk is naturally larger
+    # Base threshold 0.05 is for 30fps; scale proportionally
+    threshold = 0.05 * (30.0 / max(fps_hint, 1.0)) ** 2 if fps_hint else 0.05
+    score = 100.0 * (1.0 - min(avg_jerk / threshold, 1.0))
     return _clamp(score)
 
 
@@ -166,6 +169,7 @@ def _calc_technique(
 
 def _calc_stability(
     positions_window: list[dict[str, tuple[float, float]]],
+    fps_hint: float = 30.0,
 ) -> float:
     """Stability from joint displacement standard deviation.
 
@@ -188,8 +192,9 @@ def _calc_stability(
         return _DEFAULT_SCORE
 
     avg_std = float(np.mean(displacements))
-    # Map: std=0 → 100, std>=0.03 → 0
-    score = 100.0 * (1.0 - min(avg_std / 0.03, 1.0))
+    # Scale threshold by frame interval — at low fps, displacement between frames is larger
+    threshold = 0.03 * (30.0 / max(fps_hint, 1.0))
+    score = 100.0 * (1.0 - min(avg_std / threshold, 1.0))
     return _clamp(score)
 
 
@@ -230,16 +235,17 @@ def _calc_vertical_velocity(
     com_prev: tuple[float, float] | None,
     com_curr: tuple[float, float] | None,
     dt: float,
+    img_height: int = 1,
 ) -> float:
-    """Vertical velocity of COM between frames.
+    """Vertical velocity of COM between frames in px/s.
 
     Positive = moving upward (y decreasing in image coords).
     Returns 0 if data insufficient.
     """
     if com_prev is None or com_curr is None or dt <= 0:
         return 0.0
-    # In image coords, y increases downward, so negate for "upward = positive"
-    return -(com_curr[1] - com_prev[1]) / dt
+    # Convert normalized coords to pixels, negate for "upward = positive"
+    return -(com_curr[1] - com_prev[1]) * img_height / dt
 
 
 # ── Main entry point ────────────────────────────────────────────────
@@ -251,6 +257,7 @@ _WINDOW_SIZE = 5
 def compute_frame_metrics(
     frame_sequence: list[dict],
     fps: float,
+    img_height: int = 960,
 ) -> list[FrameMetrics]:
     """Compute performance metrics for each frame in the sequence.
 
@@ -303,7 +310,7 @@ def compute_frame_metrics(
         # Smoothness: needs prev and next frame positions
         prev_pos = all_positions[i - 1] if i > 0 else None
         next_pos = all_positions[i + 1] if i < n - 1 else None
-        smoothness = _calc_smoothness(prev_pos, all_positions[i], next_pos)
+        smoothness = _calc_smoothness(prev_pos, all_positions[i], next_pos, fps_hint=fps)
 
         # Technique: sliding window over COM history
         if i in com_index_map:
@@ -317,7 +324,7 @@ def compute_frame_metrics(
         # Stability: sliding window over joint positions
         w_start_idx = max(0, i - _WINDOW_SIZE // 2)
         w_end_idx = min(n, i + _WINDOW_SIZE // 2 + 1)
-        stability = _calc_stability(all_positions[w_start_idx:w_end_idx])
+        stability = _calc_stability(all_positions[w_start_idx:w_end_idx], fps_hint=fps)
 
         # Adhesion
         adhesion = _calc_adhesion(kps, holds)
@@ -328,7 +335,7 @@ def compute_frame_metrics(
         # Vertical velocity
         com_prev = all_coms[i - 1] if i > 0 else None
         com_curr = all_coms[i]
-        vertical_velocity = _calc_vertical_velocity(com_prev, com_curr, dt)
+        vertical_velocity = _calc_vertical_velocity(com_prev, com_curr, dt, img_height)
 
         results.append(FrameMetrics(
             smoothness=round(smoothness, 1),
