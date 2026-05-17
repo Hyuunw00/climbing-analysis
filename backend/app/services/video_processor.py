@@ -11,6 +11,7 @@ from app.services.path_predictor import predict_next_holds
 from app.services.force_estimator import estimate_force_distribution
 from app.services.performance_scorer import compute_frame_metrics
 from app.services.pose_estimator import PoseEstimator
+from app.models.schemas import PoseKeypoint as PK
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,49 @@ def extract_frames(file_path: str, target_fps: int | None = None) -> list[tuple[
     return frames
 
 
+# ── Training data collection ───────────────────────────────────────
+
+_TRAINING_DATA_DIR = "data/processed"
+_TRAINING_DATA_FILE = "user_training_data.jsonl"
+
+
+def _collect_training_samples(frame_results: list[dict]) -> None:
+    """Extract move events from analyzed frames and append to training data file."""
+    import json, os
+    from app.ml.labeler import detect_move_events
+    from app.ml.features import extract_features
+
+    events = detect_move_events(frame_results)
+    if not events:
+        return
+
+    os.makedirs(_TRAINING_DATA_DIR, exist_ok=True)
+    filepath = os.path.join(_TRAINING_DATA_DIR, _TRAINING_DATA_FILE)
+
+    samples_written = 0
+    with open(filepath, "a") as f:
+        for event in events:
+            frame = frame_results[event.frame_idx]
+            pose = frame.get("pose", [])
+            holds = frame.get("holds", [])
+            if not pose or not holds:
+                continue
+
+            kps = [PK(**kp) if isinstance(kp, dict) else kp for kp in pose]
+            for hold in holds:
+                feats = extract_features(kps, holds, event.hand, hold)
+                row = feats.copy()
+                row["label"] = 1.0 if hold.get("id") == event.target_hold_id else 0.0
+                row["hand"] = event.hand
+                row["target_hold_id"] = event.target_hold_id
+                row["candidate_hold_id"] = hold.get("id", "")
+                f.write(json.dumps(row) + "\n")
+                samples_written += 1
+
+    if samples_written > 0:
+        logger.info("Collected %d training samples from %d move events", samples_written, len(events))
+
+
 # ── Main pipeline ───────────────────────────────────────────────────
 
 # Number of frames to scan for building the hold map
@@ -289,7 +333,6 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
         if not keypoints:
             continue
 
-        from app.models.schemas import PoseKeypoint as PK
         lwrist = next((k for k in keypoints if k.name == "left_wrist" and k.confidence >= 0.3), None)
         rwrist = next((k for k in keypoints if k.name == "right_wrist" and k.confidence >= 0.3), None)
 
@@ -341,7 +384,6 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
         # Path prediction with fixed route holds
         predictions = []
         if pose_keypoints and route_holds:
-            from app.models.schemas import PoseKeypoint as PK
             kps = [PK(**kp) for kp in pose_keypoints]
             raw_preds = predict_next_holds(kps, route_holds)
             predictions = [p.model_dump() for p in raw_preds]
@@ -349,7 +391,6 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
         # Force distribution
         force_dist = None
         if pose_keypoints:
-            from app.models.schemas import PoseKeypoint as PK
             kps_for_force = [PK(**kp) for kp in pose_keypoints]
             force_dist = estimate_force_distribution(kps_for_force)
 
@@ -378,6 +419,9 @@ def process_video(file_path: str, on_progress: callable = None) -> dict:
             "score": m.score,
             "vertical_velocity": m.vertical_velocity,
         }
+
+    # ── Phase 5: Collect training data from user uploads ──────────
+    _collect_training_samples(frame_results)
 
     return {
         "metadata": {

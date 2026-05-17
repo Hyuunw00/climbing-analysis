@@ -1,9 +1,15 @@
-"""Rule-based path prediction for climbing route analysis."""
+"""Path prediction for climbing route analysis.
 
+Uses ML model (XGBoost) when available, falls back to rule-based prediction.
+"""
+
+import logging
 import math
 
+from app.config import settings
 from app.models.schemas import PoseKeypoint, Prediction
 
+logger = logging.getLogger(__name__)
 
 # MediaPipe landmark indices
 LEFT_WRIST = 15
@@ -14,6 +20,21 @@ MAX_REACH = 0.35
 
 # Top N candidates to return per hand
 TOP_N = 3
+
+# ── ML predictor (lazy-loaded singleton) ──────────────────────────────
+
+_ml_predictor = None
+
+
+def _get_ml_predictor():
+    global _ml_predictor
+    if _ml_predictor is None:
+        from app.ml.predictor import MLPathPredictor
+        _ml_predictor = MLPathPredictor(settings.path_model_path)
+    return _ml_predictor
+
+
+# ── Rule-based fallback ───────────────────────────────────────────────
 
 
 def _euclidean_distance(x1: float, y1: float, x2: float, y2: float) -> float:
@@ -73,24 +94,11 @@ def _score_holds_for_hand(
     return predictions
 
 
-def predict_next_holds(
+def _rule_based_predict(
     pose_keypoints: list[PoseKeypoint],
     holds: list[dict],
 ) -> list[Prediction]:
-    """
-    Predict next holds based on current pose and detected holds.
-
-    Args:
-        pose_keypoints: Full list of 33 MediaPipe pose keypoints.
-        holds: List of detected holds with id, x, y fields.
-
-    Returns:
-        List of Prediction objects (up to TOP_N per hand).
-    """
-    if not pose_keypoints or not holds:
-        return []
-
-    # Need at least enough keypoints to access wrists
+    """Rule-based prediction (distance + direction scoring)."""
     if len(pose_keypoints) <= max(LEFT_WRIST, RIGHT_WRIST):
         return []
 
@@ -99,7 +107,6 @@ def predict_next_holds(
     left_wrist = pose_keypoints[LEFT_WRIST]
     right_wrist = pose_keypoints[RIGHT_WRIST]
 
-    # Only predict if wrist is visible enough
     if left_wrist.visibility > 0.3:
         predictions.extend(
             _score_holds_for_hand(left_wrist.x, left_wrist.y, holds, "left")
@@ -111,3 +118,39 @@ def predict_next_holds(
         )
 
     return predictions
+
+
+# ── Public API (unchanged interface) ──────────────────────────────────
+
+
+def predict_next_holds(
+    pose_keypoints: list[PoseKeypoint],
+    holds: list[dict],
+) -> list[Prediction]:
+    """
+    Predict next holds based on current pose and detected holds.
+
+    Uses ML model when available, falls back to rule-based prediction.
+
+    Args:
+        pose_keypoints: Full list of 33 MediaPipe pose keypoints.
+        holds: List of detected holds with id, x, y fields.
+
+    Returns:
+        List of Prediction objects (up to TOP_N per hand).
+    """
+    if not pose_keypoints or not holds:
+        return []
+
+    # Try ML predictor first
+    ml = _get_ml_predictor()
+    if ml.is_available:
+        try:
+            result = ml.predict(pose_keypoints, holds)
+            if result:
+                return result
+        except Exception as e:
+            logger.warning("ML prediction failed, falling back to rules: %s", e)
+
+    # Fallback to rule-based
+    return _rule_based_predict(pose_keypoints, holds)
